@@ -1,6 +1,3 @@
-# calculator.py
-
-
 from typing import Callable, Dict
 
 
