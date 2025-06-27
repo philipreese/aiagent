@@ -5,6 +5,7 @@ from google import genai
 from google.genai import types
 from prompts import system_prompt
 from call_function import available_functions, call_function
+from config import MAX_ITERS
 
 
 def main():
@@ -18,20 +19,34 @@ def main():
     client = genai.Client(api_key=api_key)
     prompt = sys.argv[1]
     verbose = "--verbose" in sys.argv
+    if verbose:
+        print(f"User prompt: {prompt}\n")
 
     messages = [
         types.Content(role="user", parts=[types.Part(text=prompt)]),
     ]
 
-    generate_content(client, messages, available_functions, verbose)
+    iterations = 0
+    while True:
+        iterations += 1
+        if iterations > MAX_ITERS:
+            print(f"Maximum iterations ({MAX_ITERS}) reached, exiting.")
+            sys.exit(1)
+
+        try:
+            response = generate_content(client, messages, verbose)
+            if response:
+                print("Final response:\n", response)
+                break
+        except Exception as e:
+            print(f"Error in generate_content: {e}")
 
 
 def generate_content(
     client: genai.Client,
     messages: list[types.Content],
-    available_functions: types.Tool,
     verbose: bool = False,
-) -> None:
+) -> str | None:
     response = client.models.generate_content(  # type: ignore
         model="gemini-2.0-flash-001",
         contents=messages,
@@ -45,13 +60,16 @@ def generate_content(
         return
 
     if verbose:
-        print("User prompt:", messages[0])
         print("Prompt tokens:", response.usage_metadata.prompt_token_count)
         print("Response tokens:", response.usage_metadata.candidates_token_count)
 
+    if response.candidates:
+        for candidate in response.candidates:
+            if candidate.content:
+                messages.append(candidate.content)
+
     if not response.function_calls:
-        print(response.text)
-        return
+        return response.text
 
     function_responses: list[types.Part] = []
     for function_call in response.function_calls:
@@ -69,6 +87,8 @@ def generate_content(
 
     if not function_responses:
         raise Exception("no function responses generated, exiting.")
+
+    messages.append(types.Content(role="tool", parts=function_responses))
 
 
 if __name__ == "__main__":

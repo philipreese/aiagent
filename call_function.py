@@ -16,7 +16,9 @@ available_functions = types.Tool(
 )
 
 
-def call_function(function_call: types.FunctionCall, verbose: bool = False):
+def call_function(
+    function_call: types.FunctionCall, verbose: bool = False
+) -> types.Content:
     if verbose:
         print(f"Calling function: {function_call.name}({function_call.args})")
     else:
